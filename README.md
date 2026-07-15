@@ -18,6 +18,50 @@ decisions.
 - **Distro-portable by structure, not by speculation.** The layout is ready for
   Fedora/Debian, but only the Arch package list is actually populated. Untested
   lists rot, so we don't write them until we boot that distro.
+- **Config files carry values; this README carries the *why*.** Tracked configs
+  stay comment-free, and record **only settings that differ from the app's own
+  defaults** (check against its dump — e.g. `ghostty +show-config --default`).
+  The two rules compose: every line in a config is then, by definition, a
+  deliberate deviation, so the file needs no commentary to explain itself. A
+  config that restates defaults reads like intent and drifts silently the day
+  upstream changes its mind.
+
+## Theming (deferred, on purpose)
+
+Theme is currently **hardcoded** in `dot_config/ghostty/config` (`theme = Flexoki
+Dark`). Ghostty is the only consumer today, and centralizing a value used in one
+place means guessing a schema before its other users exist. Lifting it later is
+cheap and local — rename `config` → `config.tmpl`, add the data file — so
+deferring costs nothing.
+
+**Lift it when the second consumer lands** (tmux or nvim). The shape should be
+the *active theme only*, one entry per app:
+
+```yaml
+# home/.chezmoidata/theme.yaml
+theme:
+  ghostty: "Flexoki Dark"     # ghostty's own registry name
+  nvim: flexoki-dark          # colorscheme name; also needs the plugin
+  tmux: flexoki               # plugin name, or hex values
+```
+
+Swapping then means editing one file, and `apply` moves every app in lockstep —
+that lockstep is the win, not the line count.
+
+Two things that look tempting and are not:
+
+- **A single theme string shared by all apps.** It doesn't propagate. The apps
+  disagree on both name *and* representation: ghostty has a built-in registry
+  (one line), nvim needs a *plugin* plus a `colorscheme` call, tmux wants hex or
+  its own plugin. Only the decision is portable, never the value — hence a
+  per-app mapping.
+- **Centralizing the 16-color palette as hex and rendering everything from it.**
+  Works for ghostty and tmux; dies at nvim, where a theme colors *hundreds* of
+  semantic highlight groups (diagnostics, diff, treesitter, LSP). 16 ANSI colors
+  can't express that, and hand-writing highlight groups loses to the plugin.
+- **A matrix of every theme with an `active:` selector.** Same failure mode as
+  the distro lists above: mappings for themes we don't run are untested, and
+  untested lists rot.
 
 ## Layout
 
@@ -40,7 +84,7 @@ CI) and only `home/` is applied to `$HOME`.
     ├── .chezmoiexternal.toml     # assets fetched from URLs (fonts, pinned plugins)
     └── dot_config/               # → ~/.config/
         ├── niri/config.kdl
-        ├── kitty/kitty.conf
+        ├── ghostty/config        # no extension — ghostty only reads `config`
         └── nvim/                 # hand-rolled, managed inline (see below)
 ```
 
@@ -73,7 +117,7 @@ packages:
   arch:
     pacman:
       - niri
-      - kitty
+      - ghostty
       - neovim
       - fzf
       - fuzzel
