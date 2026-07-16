@@ -1,6 +1,4 @@
-font-family = 0xProto Nerd Font Mono
-
-theme = Flexoki Dark
+theme = solarized_osaka_dark
 
 window-padding-x = 8
 window-padding-y = 8
