@@ -1,7 +1,10 @@
 packages:
   arch:
     pacman:
+      - git
       - ghostty
+      - tmux
+      - wl-clipboard
     aur: []
   fedora:
     dnf: []

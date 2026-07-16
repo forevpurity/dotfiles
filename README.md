@@ -26,19 +26,17 @@ decisions.
   config that restates defaults reads like intent and drifts silently the day
   upstream changes its mind.
 
-## Theming (deferred, on purpose)
+## Theming
 
-Theme is currently **hardcoded** in `dot_config/ghostty/config`
-(`theme = solarized_osaka_dark`) and backed by a **vendored theme file** at
-`dot_config/ghostty/themes/solarized_osaka_dark` — a hex palette we own, not one
-of ghostty's 463 built-in registry names. Ghostty resolves `theme = <name>` by
-looking for `<name>` in `~/.config/ghostty/themes/` before its own registry, so
-the filename must match the `theme =` value exactly.
+The active themes are selected in `home/.chezmoidata/theme.yaml`, with one value
+per app. Ghostty and tmux configs are templates that read their own entry, so a
+theme change stays coordinated without pretending the apps share a theme format.
+Both currently use the vendored `solarized_osaka_dark` theme.
 
-Ghostty is the only consumer today, and centralizing a value used in one place
-means guessing a schema before its other users exist. Lifting it later is cheap
-and local — rename `config` → `config.tmpl`, add the data file — so deferring
-costs nothing.
+Ghostty's theme lives at
+`dot_config/ghostty/themes/solarized_osaka_dark`; tmux's independent status-line
+theme lives at `dot_config/tmux/themes/solarized_osaka_dark.conf`. The matching
+names are a convention, not a shared implementation.
 
 ### ⚠️ A vendored theme must be committed, not just applied
 
@@ -54,19 +52,17 @@ theme "solarized_osaka_dark" not found, tried path ".../ghostty/themes/..."   # 
 Rule: `git add` the theme file in the same commit as the `theme =` line that
 references it. They are one change, and splitting them ships a broken config.
 
-**Lift it when the second consumer lands** (tmux or nvim). The shape should be
-the *active theme only*, one entry per app:
+The data has the shape of the *active theme only*, one entry per app:
 
 ```yaml
 # home/.chezmoidata/theme.yaml
 theme:
-  ghostty: solarized_osaka_dark  # vendored file in dot_config/ghostty/themes/
-  nvim: <colorscheme>            # confirm when nvim lands; also needs the plugin
-  tmux: <plugin-or-hex>          # confirm when tmux lands
+  ghostty: solarized_osaka_dark
+  tmux: solarized_osaka_dark
 ```
 
-Swapping then means editing one file, and `apply` moves every app in lockstep —
-that lockstep is the win, not the line count.
+Swapping means adding the app-specific theme files and editing this one file;
+`apply` then moves every app in lockstep.
 
 Two things that look tempting and are not:
 
@@ -79,9 +75,8 @@ Two things that look tempting and are not:
   Works for ghostty and tmux; dies at nvim, where a theme colors *hundreds* of
   semantic highlight groups (diagnostics, diff, treesitter, LSP). 16 ANSI colors
   can't express that, and hand-writing highlight groups loses to the plugin.
-  Note the vendored theme file means we now *own* those 16 hex values in-repo, so
-  feeding tmux from them is plausible when it lands — but that still doesn't
-  rescue nvim, which wants a plugin either way.
+  The tmux theme can reuse those values because its surface is small, but that
+  still doesn't rescue nvim, which wants a plugin either way.
 - **A matrix of every theme with an `active:` selector.** Same failure mode as
   the distro lists above: mappings for themes we don't run are untested, and
   untested lists rot.
@@ -104,12 +99,15 @@ CI) and only `home/` is applied to `$HOME`.
     │   ├── run_onchange_after_20-enable-services.sh.tmpl
     │   └── run_once_after_30-set-shell.sh.tmpl
     ├── .chezmoiignore
-    ├── .chezmoiexternal.toml     # assets fetched from URLs (fonts, pinned plugins)
+    ├── .chezmoiexternal.toml     # external assets and repository bootstraps
     └── dot_config/               # → ~/.config/
         ├── niri/config.kdl
         ├── ghostty/
-        │   ├── config            # no extension — ghostty only reads `config`
+        │   ├── config.tmpl       # renders to ghostty's extensionless `config`
         │   └── themes/           # vendored custom themes, referenced by filename
+        ├── tmux/
+        │   ├── tmux.conf.tmpl
+        │   └── themes/           # status-line themes, sourced by tmux.conf
         └── nvim/                 # hand-rolled, managed inline (see below)
 ```
 
@@ -131,6 +129,19 @@ The whole mental model is attribute prefixes on source filenames:
 distro like LazyVim). Only split it into its own repo via `.chezmoiexternal` if it
 grows its own life. Plugin/lockfile install dirs go in `.chezmoiignore` so chezmoi
 never tracks downloaded plugins.
+
+## Tmux plugins
+
+Tmux plugins use TPM with a strict ownership boundary. Chezmoi owns the plugin
+declarations in `tmux.conf` and bootstraps only TPM itself as a `git-repo`
+external. TPM owns all other checkouts under `~/.config/tmux/plugins/`; those
+directories do not appear in the chezmoi source tree.
+
+The `dot_config/tmux/` directory must remain normal and non-`exact_`, which makes
+`chezmoi apply` leave TPM's checkouts alone. On a fresh machine, run
+`chezmoi apply`, start tmux, then press `prefix + I` once to install the declared
+plugins. Add, remove, and update plugins through TPM thereafter; never manage
+the same plugin directory with both TPM and a chezmoi external.
 
 ## Package management
 
